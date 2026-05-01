@@ -3,3 +3,4 @@ torch
 python-dotenv
 numpy
 flask-cors
+math

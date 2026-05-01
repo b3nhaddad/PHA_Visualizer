@@ -1,0 +1,5 @@
+flask
+torch
+python-dotenv
+numpy
+flask-cors

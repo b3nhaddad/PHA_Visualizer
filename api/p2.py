@@ -1,11 +1,23 @@
 from flask import Blueprint, jsonify, request
 from math import ceil, sqrt
+import torch
+
+trajectories = []
 
 p2_bp = Blueprint("p2", __name__)
 
-@app.route("/state", methods=["GET"])
+@p2_bp.route("/state", methods=["GET"])
 def get_state():
+
     return jsonify({"state": get_state()})
+
+@p2_bp.route("/state", methods=["POST"])
+def set_state():
+    state = get_state()
+    step_size = state.get("step_size")
+    dimenstionality = state.get("step_size")
+    start_position = state.get("step_size")
+    return jsonify({"status": 200})
 
 
 def spatial_hessian_descent_p2(step_size, dimensionality, start_position, hessian_fn, gradient_fn=None, n_steps=None):
@@ -52,3 +64,4 @@ def spatial_hessian_descent_p2(step_size, dimensionality, start_position, hessia
         trajectory.append(position.clone())
 
     return trajectory
+

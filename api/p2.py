@@ -62,6 +62,7 @@ def spatial_hessian_descent_p2(step_size, dimensionality, start_position, hessia
         position = (position / torch.linalg.norm(position) * target_radius).flatten()
 
         trajectory.append(position.clone())
+        #
 
     return trajectory
 

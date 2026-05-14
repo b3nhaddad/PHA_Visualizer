@@ -9,7 +9,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 p3_bp = Blueprint("p3", __name__)
 
-def spatial_hessian_descentp3(step_size, dimensionality, start_position, hessian_fn, gradient_fn=None, n_steps=None):
+def spatial_hessian_descentp3(step_size, dimensionality, start_position, hessian_fn, gradient_fn=None, n_steps=None, J=None):
     """
     This code uses the most negative eigenvector of the Hessian, since this value is 2v^T ∇^2Hₙ(σq)v is as negative as possible
     We do not use the Gradient of the hessian (first order derivative) because "we should have ∇HN (σq) ≈ 0, so we probably should not choose v

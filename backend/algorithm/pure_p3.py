@@ -138,6 +138,7 @@ def build(model: PureSpinSpec, k: int) -> AlgorithmResult:
         start_position=torch.zeros(N, device=_device),
         hessian_fn=hessian_fn,
         n_steps=k,
+        J = J,
     )  # replace with the actual call
 
     # ── Step 5: Compute E_∞ and assemble the result ────────────────────

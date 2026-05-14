@@ -44,8 +44,8 @@ import torch
 
 from algorithm.protocol import AlgorithmResult
 from api.models import MixedSpinSpec, RunPredictions
-from pure_p2 import _make_disorder
-from pure_p3 import _make_disorder_p3
+from algorithm.pure_p2 import _make_disorder
+from algorithm.pure_p3 import _make_disorder_p3
 
 _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -160,9 +160,9 @@ def build(model: MixedSpinSpec, k: int) -> AlgorithmResult:
     #   p=3 term: c.beta * einsum("ijk,i,j,k->", J3, σ,σ,σ) / (6·N²)
     #
     #energy_fn = None    # replace with your function
-    def energy_fn(sigma) -> float:
+    # def energy_fn(sigma) -> float:
 
-    return
+    # return
 
     # ── Step 8: Define spectral edge callable ───────────────────────────
     #

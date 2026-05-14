@@ -25,6 +25,8 @@ const TIP_STYLE = {
   contentStyle: { background: '#fff', border: '1px solid #d4d4d8', fontSize: 11, borderRadius: 6 },
   labelStyle: { color: '#3f3f46' },
 };
+const TICK = { fill: '#52525b', fontSize: 10 };
+const tickFmt = (v: unknown) => (v as number).toFixed(1);
 
 export default function SpectrumPanel() {
   const { runData, currentStep } = useStore();
@@ -32,28 +34,38 @@ export default function SpectrumPanel() {
 
   const snap = runData.snapshots[currentStep];
   if (!snap) return null;
-  const { full_spectrum, eigvals_topK, spectral_edge_target, lambda_min_tangent, q } = snap;
+  const { eigvals_topK, spectral_edge_target, lambda_min_tangent, q } = snap;
+
+  // Use the most recent full_spectrum at or before currentStep so the
+  // histogram doesn't disappear on non-5 steps during fast playback.
+  const latestFullSpectrum = useMemo(() => {
+    for (let i = currentStep; i >= 0; i--) {
+      if (runData.snapshots[i]?.full_spectrum) return runData.snapshots[i].full_spectrum!;
+    }
+    return null;
+  }, [runData.snapshots, currentStep]);
 
   const histData = useMemo(
-    () => (full_spectrum ? histBins(full_spectrum) : null),
-    [full_spectrum]
+    () => (latestFullSpectrum ? histBins(latestFullSpectrum) : null),
+    [latestFullSpectrum]
   );
 
   const topKData = useMemo(
-    () => eigvals_topK.map(v => ({ x: v, y: 0.5 })),
+    () => eigvals_topK.map((v, i) => ({ x: v, y: i % 2 === 0 ? 0.3 : 0.7 })),
     [eigvals_topK]
   );
 
-  const allVals = full_spectrum ?? eigvals_topK;
-  const xMin = Math.min(...allVals, spectral_edge_target) - 0.3;
-  const xMax = Math.max(...allVals) + 0.3;
+  const pad = 0.15;
+  const topKMin = Math.min(...eigvals_topK) - pad;
+  const topKMax = Math.max(...eigvals_topK) + pad;
 
-  const tickFmt = (v: unknown) => (v as number).toFixed(1);
-  const tickStyle = { fill: '#52525b', fontSize: 10 };
+  const histVals = latestFullSpectrum ?? eigvals_topK;
+  const histMin = Math.min(...histVals, spectral_edge_target) - pad;
+  const histMax = Math.max(...histVals) + pad;
 
   return (
-    <div className="h-full flex flex-col p-3 gap-2 bg-white">
-      {/* Title */}
+    <div className="h-full flex flex-col p-3 gap-2 bg-white overflow-hidden">
+      {/* Title row */}
       <div className="flex items-center justify-between shrink-0">
         <span className="text-xs font-semibold text-zinc-700">
           Hessian Spectrum — q = {q.toFixed(3)}
@@ -81,42 +93,49 @@ export default function SpectrumPanel() {
         </span>
       </div>
 
-      {/* Chart */}
+      {/* Top-K scatter — always visible */}
+      <div className="shrink-0" style={{ height: 90 }}>
+        <p className="text-xs text-zinc-400 mb-0.5">Top-{eigvals_topK.length} eigenvalues</p>
+        <ResponsiveContainer width="100%" height="100%">
+          <ScatterChart margin={{ top: 4, right: 8, bottom: 14, left: 0 }}>
+            <XAxis type="number" dataKey="x" domain={[topKMin, topKMax]} tickCount={5}
+              tickFormatter={tickFmt} tick={TICK} />
+            <YAxis type="number" dataKey="y" hide domain={[0, 1]} padding={{ top: 10, bottom: 10 }} />
+            <Tooltip {...TIP_STYLE}
+              formatter={(v, name) => [name === 'x' ? (v as number).toFixed(4) : v, name === 'x' ? 'λ' : name]} />
+            <Scatter data={topKData} fill="#3b82f6" isAnimationActive={false} r={3} />
+            <ReferenceLine x={spectral_edge_target} stroke="#d97706" strokeWidth={1.5} strokeDasharray="4 3" />
+            <ReferenceLine x={lambda_min_tangent} stroke="#dc2626" strokeWidth={1.5} />
+          </ScatterChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div className="w-full h-px bg-zinc-100 shrink-0" />
+
+      {/* Distribution histogram — always visible, uses last stored full_spectrum */}
       <div className="flex-1 min-h-0">
+        <p className="text-xs text-zinc-400 mb-0.5">
+          {histData
+            ? `Full distribution (${latestFullSpectrum!.length} eigvals)`
+            : 'Full distribution — waiting for first spectrum…'}
+        </p>
         {histData ? (
-          <>
-            <p className="text-xs text-zinc-400 mb-1">
-              Full spectrum ({full_spectrum!.length} tangent eigvals)
-            </p>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={histData} margin={{ top: 2, right: 8, bottom: 16, left: 0 }}>
-                <XAxis dataKey="x" type="number" domain={[xMin, xMax]} tickCount={5}
-                  tickFormatter={tickFmt} tick={tickStyle} />
-                <YAxis hide />
-                <Tooltip {...TIP_STYLE} labelFormatter={v => `λ ≈ ${(v as number).toFixed(3)}`}
-                  formatter={v => [v, 'count']} />
-                <Bar dataKey="count" fill="#93c5fd" isAnimationActive={false} />
-                <ReferenceLine x={spectral_edge_target} stroke="#d97706" strokeWidth={1.5} strokeDasharray="4 3" />
-                <ReferenceLine x={lambda_min_tangent} stroke="#dc2626" strokeWidth={1.5} />
-              </BarChart>
-            </ResponsiveContainer>
-          </>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={histData} margin={{ top: 2, right: 8, bottom: 14, left: 0 }}>
+              <XAxis dataKey="x" type="number" domain={[histMin, histMax]} tickCount={5}
+                tickFormatter={tickFmt} tick={TICK} />
+              <YAxis hide />
+              <Tooltip {...TIP_STYLE} labelFormatter={v => `λ ≈ ${(v as number).toFixed(3)}`}
+                formatter={v => [v, 'count']} />
+              <Bar dataKey="count" fill="#93c5fd" isAnimationActive={false} />
+              <ReferenceLine x={spectral_edge_target} stroke="#d97706" strokeWidth={1.5} strokeDasharray="4 3" />
+              <ReferenceLine x={lambda_min_tangent} stroke="#dc2626" strokeWidth={1.5} />
+            </BarChart>
+          </ResponsiveContainer>
         ) : (
-          <>
-            <p className="text-xs text-zinc-400 mb-1">Top-20 eigenvalues (full spectrum not stored)</p>
-            <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 16, right: 8, bottom: 16, left: 0 }}>
-                <XAxis type="number" dataKey="x" domain={[xMin, xMax]} tickCount={5}
-                  tickFormatter={tickFmt} tick={tickStyle} />
-                <YAxis type="number" dataKey="y" hide domain={[0, 1]} />
-                <Tooltip {...TIP_STYLE}
-                  formatter={(v, name) => [name === 'x' ? (v as number).toFixed(4) : v, name === 'x' ? 'λ' : name]} />
-                <Scatter data={topKData} fill="#3b82f6" isAnimationActive={false} />
-                <ReferenceLine x={spectral_edge_target} stroke="#d97706" strokeWidth={1.5} strokeDasharray="4 3" />
-                <ReferenceLine x={lambda_min_tangent} stroke="#dc2626" strokeWidth={1.5} />
-              </ScatterChart>
-            </ResponsiveContainer>
-          </>
+          <div className="flex items-center justify-center h-full text-zinc-300 text-xs">
+            stored every 5 steps
+          </div>
         )}
       </div>
 

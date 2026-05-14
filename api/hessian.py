@@ -8,7 +8,9 @@ def H_p2(s, J):
     #J is the GOE and is centered at (0, 1/N) variance
     return -s @ J @ s
 
-def hessian_fn(H):
-    #calculates the hessian of the hamiltonian at sigma
-    hessian = jax.hessian(H)
-    return hessian
+
+def hessian_fn(sigma,H):
+    sigma = sigma.detach().flatten().requires_grad_(True)
+    return torch.autograd.functional.hessian(H, sigma)
+
+def H_p3(s,J):

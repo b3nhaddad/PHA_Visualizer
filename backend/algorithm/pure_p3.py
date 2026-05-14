@@ -69,7 +69,7 @@ def _make_disorder_p3(N: int, seed: int) -> torch.Tensor:
          J.permute(1, 2, 0) + J.permute(2, 0, 1) +
          J.permute(2, 1, 0)) / 6
 
-    J = J / (N ** (2 / 3))  # standard normalization for p=3
+    J = J * 6.0  # symmetrized randn has variance 1/6; need variance 6 for spectral edge -2√6√q
     return J.to(_device)
 
 
@@ -138,8 +138,13 @@ def build(model: PureSpinSpec, k: int) -> AlgorithmResult:
         start_position=torch.zeros(N, device=_device),
         hessian_fn=hessian_fn,
         n_steps=k,
-        J = J,
-    )  # replace with the actual call
+    )
+
+    # For p=3 the Hessian at σ=0 is identically zero, so the first step direction
+    # is implementation-arbitrary. Since H is odd (H(−σ) = −H(σ)), a wrong first
+    # sign maximizes energy for the entire run. Detect and correct here.
+    if energy_fn(trajectory[-1]) > 0:
+        trajectory = [(-sigma).clone() for sigma in trajectory]
 
     # ── Step 5: Compute E_∞ and assemble the result ────────────────────
     #

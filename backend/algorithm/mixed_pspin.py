@@ -44,6 +44,8 @@ import torch
 
 from algorithm.protocol import AlgorithmResult
 from api.models import MixedSpinSpec, RunPredictions
+import algorithm.p3 as _p3_module
+from algorithm.p3 import spatial_hessian_descentp3
 from algorithm.pure_p2 import _make_disorder
 from algorithm.pure_p3 import _make_disorder_p3
 
@@ -85,7 +87,8 @@ def _make_J3(N: int, seed: int) -> torch.Tensor:
 # `components` is model.components — each element has .p and .beta
 #
 def _xi_pp(components: list, q: float) -> float:
-    raise NotImplementedError("TODO: implement ξ''(q) = Σ β² p(p-1) q^(p-2)")
+    return sum(c.beta ** 2 * c.p * (c.p - 1) * q ** (c.p - 2) for c in components)
+    #raise NotImplementedError("TODO: implement ξ''(q) = Σ β² p(p-1) q^(p-2)")
 
 
 # ── Step 3: Spectral edge ──────────────────────────────────────────────
@@ -93,7 +96,8 @@ def _xi_pp(components: list, q: float) -> float:
 # λ_edge(q) = -2·√ξ''(q)   (always negative)
 #
 def _spectral_edge(components: list, q: float) -> float:
-    raise NotImplementedError("TODO: return -2.0 * math.sqrt(max(_xi_pp(components, q), 1e-12))")
+    return -2.0 * math.sqrt(max(_xi_pp(components, q), 1e-12))
+    #raise NotImplementedError("TODO: return -2.0 * math.sqrt(max(_xi_pp(components, q), 1e-12))")
 
 
 # ── Step 4: E_∞ ───────────────────────────────────────────────────────
@@ -102,9 +106,10 @@ def _spectral_edge(components: list, q: float) -> float:
 # Simple midpoint rule with n_pts=1000 is sufficient.
 #
 def _E_inf(components: list, n_pts: int = 1000) -> float:
-    raise NotImplementedError(
+    return sum(math.sqrt(max(_xi_pp(components, (i + 0.5) / n_pts), 0)) * (1 / n_pts) for i in range(n_pts))
+    '''''raise NotImplementedError(
         "TODO: sum sqrt(max(_xi_pp(components, (i+0.5)/n_pts), 0)) * (1/n_pts) for i in range(n_pts)"
-    )
+    )''''
 
 
 # ── Entry point (called by registry.py → subag.py → HTTP) ─────────────
@@ -117,84 +122,50 @@ def build(model: MixedSpinSpec, k: int) -> AlgorithmResult:
     components = model.components   # list of {.p, .beta}
 
     # ── Step 5: Build one disorder tensor per unique p in this mixture ──
-    #
-    # disorder is a dict: { p_value: tensor }
-    # Use seed + i to keep components independent.
-    #
-    # disorder: dict[int, torch.Tensor] = {}
-    # for i, c in enumerate(components):
-    #     if c.p not in disorder:
-    #         if c.p == 2:
-    #             disorder[2] = _make_J2(N, seed + i)
-    #         elif c.p == 3:
-    #             disorder[3] = _make_J3(N, seed + i)
-    #         # add elif c.p == 4: disorder[4] = _make_J4(N, seed + i) etc.
-    #         else:
-    #             raise NotImplementedError(f"p={c.p} disorder tensor not implemented")
-    #
-    raise NotImplementedError("TODO: build disorder dict")
+    disorder: dict[int, torch.Tensor] = {}
+    for i, c in enumerate(components):
+        if c.p not in disorder:
+            if c.p == 2:
+                disorder[2] = _make_J2(N, seed + i)
+            elif c.p == 3:
+                disorder[3] = _make_J3(N, seed + i)
+            else:
+                raise NotImplementedError(f"p={c.p} disorder tensor not implemented")
 
     # ── Step 6: Define hessian_fn ───────────────────────────────────────
-    #
-    # hessian_fn(sigma) -> N×N torch.Tensor
-    # Sum the Hessian contribution from each component:
-    #   p=2 term: c.beta * disorder[2] / sqrt(N)           (constant)
-    #   p=3 term: c.beta * einsum("ijk,k->ij", disorder[3], sigma) / N
-    #
-    # def hessian_fn(sigma: torch.Tensor) -> torch.Tensor:
-    #     H = torch.zeros(N, N, device=_device)
-    #     for c in components:
-    #         if c.p == 2:
-    #             H = H + c.beta * disorder[2] / math.sqrt(N)
-    #         elif c.p == 3:
-    #             H = H + c.beta * torch.einsum("ijk,k->ij", disorder[3], sigma) / N
-    #     return H
-    #
-    hessian_fn = None   # replace with your function
+    if 3 in disorder:
+        _p3_module.J = disorder[3]
+
+    def hessian_fn(sigma: torch.Tensor) -> torch.Tensor:
+        H = torch.zeros(N, N, device=_device)
+        for c in components:
+            if c.p == 2:
+                H = H + c.beta * disorder[2] / math.sqrt(N)
+            elif c.p == 3:
+                H = H + c.beta * torch.einsum("ijk,k->ij", disorder[3], sigma) / N
+        return H
 
     # ── Step 7: Define energy_fn ────────────────────────────────────────
-    #
-    # energy_fn(sigma) -> float
-    # Sum H_p(σ)/N for each component:
-    #   p=2 term: c.beta * σᵀJ₂σ / (2·N·√N)
-    #   p=3 term: c.beta * einsum("ijk,i,j,k->", J3, σ,σ,σ) / (6·N²)
-    #
-    #energy_fn = None    # replace with your function
-    # def energy_fn(sigma) -> float:
-
-    # return
+    def energy_fn(sigma: torch.Tensor) -> float:
+        e = 0.0
+        for c in components:
+            if c.p == 2:
+                e += c.beta * float(sigma @ (disorder[2] @ sigma)) / (2.0 * N * math.sqrt(N))
+            elif c.p == 3:
+                e += c.beta * float(torch.einsum("ijk,i,j,k->", disorder[3], sigma, sigma, sigma)) / (6.0 * N * N)
+        return e
 
     # ── Step 8: Define spectral edge callable ───────────────────────────
-    #
-    # edge_fn(q) -> float   (always negative)
-    # Just wrap _spectral_edge:
-    #   edge_fn = lambda q: _spectral_edge(components, q)
-    #
-    edge_fn = None      # replace with your lambda
+    edge_fn = lambda q: _spectral_edge(components, q)
 
-    # ── Step 9: Run your mixed descent algorithm ─────────────────────────
-    #
-    # Write (or call) your mixed p-spin descent here.
-    # The function should accept the same interface as p2/p3:
-    #
-    #   trajectory = your_mixed_descent(
-    #       step_size      = 1.0 / k,
-    #       dimensionality = N,
-    #       start_position = torch.zeros(N, device=_device),
-    #       hessian_fn     = hessian_fn,
-    #       n_steps        = k,
-    #   )
-    #
-    # trajectory must be a list of k+1 torch.Tensor vectors:
-    #   trajectory[0]   = start_position (zeros)
-    #   trajectory[1]   = position after step 1
-    #   ...
-    #   trajectory[k]   = final position
-    #
-    raise NotImplementedError(
-        "TODO: call your mixed descent algorithm and assign to `trajectory`."
+    # ── Step 9: Run the mixed descent algorithm ──────────────────────────
+    trajectory = spatial_hessian_descentp3(
+        step_size      = 1.0 / k,
+        dimensionality = N,
+        start_position = torch.zeros(N, device=_device),
+        hessian_fn     = hessian_fn,
+        n_steps        = k,
     )
-    trajectory = None   # replace with the actual call
 
     # ── Step 10: Compute E_∞ and assemble the result ───────────────────
     #

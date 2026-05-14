@@ -111,8 +111,8 @@ export default function ParameterPanel() {
             <label className="block text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">
               Dimensions
             </label>
-            <Slider label="N" value={cfg.N} min={10} max={1000} onChange={v => update({ N: v })} />
-            <Slider label="Steps k" value={cfg.n_steps} min={50} max={800} step={10}
+            <Slider label="N" value={cfg.N} min={10} max={300} onChange={v => update({ N: v })} />
+            <Slider label="Steps k" value={cfg.n_steps} min={50} max={500} step={10}
               onChange={v => update({ n_steps: v })} />
             <div className="flex items-center gap-3">
               <span className="w-16 text-xs text-zinc-600">Seed</span>

@@ -44,7 +44,6 @@ import torch
 
 from algorithm.protocol import AlgorithmResult
 from api.models import MixedSpinSpec, RunPredictions
-import algorithm.p3 as _p3_module
 from algorithm.p3 import spatial_hessian_descentp3
 from algorithm.pure_p2 import _make_disorder
 from algorithm.pure_p3 import _make_disorder_p3
@@ -107,9 +106,7 @@ def _spectral_edge(components: list, q: float) -> float:
 #
 def _E_inf(components: list, n_pts: int = 1000) -> float:
     return sum(math.sqrt(max(_xi_pp(components, (i + 0.5) / n_pts), 0)) * (1 / n_pts) for i in range(n_pts))
-    '''''raise NotImplementedError(
-        "TODO: sum sqrt(max(_xi_pp(components, (i+0.5)/n_pts), 0)) * (1/n_pts) for i in range(n_pts)"
-    )''''
+
 
 
 # ── Entry point (called by registry.py → subag.py → HTTP) ─────────────
@@ -133,8 +130,6 @@ def build(model: MixedSpinSpec, k: int) -> AlgorithmResult:
                 raise NotImplementedError(f"p={c.p} disorder tensor not implemented")
 
     # ── Step 6: Define hessian_fn ───────────────────────────────────────
-    if 3 in disorder:
-        _p3_module.J = disorder[3]
 
     def hessian_fn(sigma: torch.Tensor) -> torch.Tensor:
         H = torch.zeros(N, N, device=_device)
@@ -159,23 +154,13 @@ def build(model: MixedSpinSpec, k: int) -> AlgorithmResult:
     edge_fn = lambda q: _spectral_edge(components, q)
 
     # ── Step 9: Run the mixed descent algorithm ──────────────────────────
-    if 3 in disorder:
-        trajectory = spatial_hessian_descentp3(
-            step_size      = 1.0 / k,
-            dimensionality = N,
-            start_position = torch.zeros(N, device=_device),
-            hessian_fn     = hessian_fn,
-            n_steps        = k,
-            J = disorder[3],
-        )
-    else:
-        trajectory = spatial_hessian_descentp3(
-            step_size=1.0 / k,
-            dimensionality=N,
-            start_position=torch.zeros(N, device=_device),
-            hessian_fn=hessian_fn,
-            n_steps=k,
-        )
+    trajectory = spatial_hessian_descentp3(
+        step_size      = 1.0 / k,
+        dimensionality = N,
+        start_position = torch.zeros(N, device=_device),
+        hessian_fn     = hessian_fn,
+        n_steps        = k,
+    )
 
     # ── Step 10: Compute E_∞ and assemble the result ───────────────────
     #

@@ -71,7 +71,7 @@ export default function App() {
             {/* Sidebar */}
             <div
               className="flex flex-col border-l border-zinc-300 bg-white overflow-hidden shrink-0"
-              style={{ width: 420 }}
+              style={{ width: 300 }}
             >
               <div className="flex-1 min-h-0 border-b border-zinc-200 overflow-hidden">
                 <SpectrumPanel />

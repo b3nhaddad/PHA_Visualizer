@@ -83,9 +83,8 @@ def build(model: PureSpinSpec, k: int) -> AlgorithmResult:
 
     # ── Step 2: Build the disorder tensor ──────────────────────────────
     #
-    # J = _make_disorder(N, seed)
+    J = _make_disorder_p3(N, seed)
     #
-    raise NotImplementedError("TODO: call _make_disorder")
 
     # ── Step 2b: Inject J into p3.py's module global ───────────────────
     #
@@ -94,6 +93,7 @@ def build(model: PureSpinSpec, k: int) -> AlgorithmResult:
     #
     # _p3_module.J = J
     #
+    _p3_module.J = J
 
     # ── Step 3: Define the three physics callables ──────────────────────
     #
@@ -109,10 +109,11 @@ def build(model: PureSpinSpec, k: int) -> AlgorithmResult:
     #   -2·√(p(p-1)) · q^((p-2)/2)
     #   For p=3: -2·√6 · √q
     #   General formula: -2·√(p(p-1)) · max(q, 1e-9)^((p-2)/2)
-    #
-    hessian_fn = None   # replace with your lambda / function
-    energy_fn  = None
-    edge_fn    = None
+    hessian_fn = lambda sigma: torch.einsum("ijk,k->ij", J, sigma) / N
+
+    energy_fn = lambda sigma: torch.einsum("ijk,i,j,k->", J, sigma, sigma, sigma) / (6.0 * N * N)
+
+    edge_fn = lambda q: -2.0 * math.sqrt(3 * 2) * max(q, 1e-9) ** 0.5
 
     # ── Step 4: Run the descent algorithm ──────────────────────────────
     #
@@ -131,14 +132,20 @@ def build(model: PureSpinSpec, k: int) -> AlgorithmResult:
     #     n_steps        = k,
     # )
     #
-    trajectory = None   # replace with the actual call
+    trajectory = spatial_hessian_descentp3(
+        step_size=1.0 / k,
+        dimensionality=N,
+        start_position=torch.zeros(N, device=_device),
+        hessian_fn=hessian_fn,
+        n_steps=k,
+    )  # replace with the actual call
 
     # ── Step 5: Compute E_∞ and assemble the result ────────────────────
     #
     # E_inf = 2·√((p-1)/p)
     # Fill the formula strings — they appear in the UI.
     #
-    E_inf = None   # replace: 2.0 * math.sqrt((_P - 1) / _P)
+    E_inf = 2.0 * math.sqrt((_P - 1) / _P)   # replace: 2.0 * math.sqrt((_P - 1) / _P)
 
     return AlgorithmResult(
         trajectory=trajectory,

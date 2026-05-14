@@ -44,8 +44,13 @@ import torch
 
 from algorithm.protocol import AlgorithmResult
 from api.models import MixedSpinSpec, RunPredictions
+from pure_p2 import _make_disorder
+from pure_p3 import _make_disorder_p3
 
 _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+#step 0
 
 
 # ── Step 1a: Disorder tensor for p=2 ──────────────────────────────────
@@ -54,9 +59,9 @@ _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Signature to keep:  _make_J2(N, seed) -> torch.Tensor
 #
 def _make_J2(N: int, seed: int) -> torch.Tensor:
-    raise NotImplementedError(
-        "TODO: randn(N,N), symmetrize with (J+J.T)/2, zero diagonal."
-    )
+    J = _make_disorder(N, seed)
+    return J.to(_device)
+
 
 
 # ── Step 1b: Disorder tensor for p=3 ──────────────────────────────────
@@ -65,9 +70,10 @@ def _make_J2(N: int, seed: int) -> torch.Tensor:
 # Signature to keep:  _make_J3(N, seed) -> torch.Tensor
 #
 def _make_J3(N: int, seed: int) -> torch.Tensor:
-    raise NotImplementedError(
-        "TODO: randn(N,N,N), average all 6 index permutations."
-    )
+    J = _make_disorder_p3(N, seed)
+    return J.to(_device)
+
+#def _make_J4(N: int, seed: int) -> torch.Tensor:
 
 
 # ── Add _make_J4, _make_J5, ... here if you need higher p ─────────────
@@ -153,7 +159,10 @@ def build(model: MixedSpinSpec, k: int) -> AlgorithmResult:
     #   p=2 term: c.beta * σᵀJ₂σ / (2·N·√N)
     #   p=3 term: c.beta * einsum("ijk,i,j,k->", J3, σ,σ,σ) / (6·N²)
     #
-    energy_fn = None    # replace with your function
+    #energy_fn = None    # replace with your function
+    def energy_fn(sigma) -> float:
+
+    return
 
     # ── Step 8: Define spectral edge callable ───────────────────────────
     #

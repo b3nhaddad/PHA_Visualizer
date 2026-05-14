@@ -60,10 +60,17 @@ _P = 3
 #
 # Signature to keep:  _make_disorder(N: int, seed: int) -> torch.Tensor
 #
-def _make_disorder(N: int, seed: int) -> torch.Tensor:
-    raise NotImplementedError(
-        "TODO: sample J — randn(N,N,N), average all 6 index permutations, move to _device."
-    )
+def _make_disorder_p3(N: int, seed: int) -> torch.Tensor:
+    g = torch.Generator()
+    g.manual_seed(seed)
+    J = torch.randn(N, N, N, generator=g)
+
+    J = (J + J.permute(0, 2, 1) + J.permute(1, 0, 2) +
+         J.permute(1, 2, 0) + J.permute(2, 0, 1) +
+         J.permute(2, 1, 0)) / 6
+
+    J = J / (N ** (2 / 3))  # standard normalization for p=3
+    return J.to(_device)
 
 
 # ── Entry point (called by registry.py → subag.py → HTTP) ─────────────

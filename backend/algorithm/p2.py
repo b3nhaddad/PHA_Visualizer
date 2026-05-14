@@ -4,7 +4,7 @@ import torch
 from api.schemas import paramaters_pure
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+ 
 trajectories = []
 _state = {}
 
@@ -20,46 +20,52 @@ def set_state():
     data = request.get_json()
     _state = paramaters_pure(data)
     return jsonify({"status": 200, "state": _state})
+ 
 
-
-def spatial_hessian_descent_p2(step_size, dimensionality, start_position, hessian_fn, gradient_fn=None, n_steps=None):
+def spatial_hessian_descent_p2(step_size, dimensionality, start_position, hessian_fn, n_steps=None):
     if n_steps is None:
         n_steps = ceil(1 / step_size)
 
     position = start_position.clone().to(device).flatten()
-    N = dimensionality
+    N = dimensionality #dimensionality
     trajectory = [position.clone()]
-
-    # Compute Hessian ONCE (constant for p=2)
-    hess = hessian_fn(position)
+    prev_v = None
 
     for i in range(n_steps):
+        hess = hessian_fn(position)
 
+        #projects Hessian to orthogonal subspace of current position
+        #this is needed because we can only move orthogonally to the sphere
         norm_sq = torch.dot(position, position)
 
-        # Project Hessian to tangent space at current position
         if norm_sq > 1e-12:
             M = torch.eye(N, device=device) - torch.outer(position, position) / norm_sq
             hess_proj = M @ hess @ M
+            #projects to tangent space ensures that the only directions to move or orhtogonal
         else:
             hess_proj = hess
 
-        # Most negative eigenvector of projected Hessian is already tangent
-        _, eigenvectors = torch.linalg.eigh(hess_proj)
+        # get eigenvalues and eigenvectors (sorted ascending, so index 0 is most negative)
+        eigenvalues, eigenvectors = torch.linalg.eigh(hess_proj)
+
+        # Find most negative eigenvector orthogonal to position
         v = eigenvectors[:, 0].clone()
 
-        # Flip sign if gradient points same direction as v
-        if gradient_fn is not None and torch.dot(v, gradient_fn(position)) > 0:
+        # Enforce sign consistency with previous step to prevent oscillation.
+        # gradient_fn check doesn't work for p=2 because H@sigma = lambda*sigma
+        # (parallel to sigma, zero dot product with all tangent vectors).
+        if prev_v is not None and torch.dot(v, prev_v) < 0:
             v = -v
+        prev_v = v.clone()
 
         position = (position + sqrt(N) * step_size * v).flatten()
 
         target_q = (i + 1) / n_steps
         target_radius = sqrt(N * target_q)
         position = (position / torch.linalg.norm(position) * target_radius).flatten()
-
+        #goes back from tangent space to the sphere
         trajectory.append(position.clone())
-        #
+        #has to return current position
 
     return trajectory
 

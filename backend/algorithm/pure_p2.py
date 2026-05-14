@@ -48,7 +48,7 @@ def _make_disorder(N: int, seed: int) -> torch.Tensor:
     g = torch.Generator()
     g.manual_seed(seed)
     J = torch.randn(N, N, generator = g)
-    J = (J+J.T) / 2.0
+    J = J + J.T
     J.fill_diagonal_(0.0)
     return J.to(_device)
 
@@ -64,9 +64,9 @@ def build(model: PureSpinSpec, k: int) -> AlgorithmResult:
     J  = _make_disorder(N, seed)
     H_const = J / math.sqrt(N)    # this is the full N×N Hessian (constant for p=2)
     
-    hessian_fn = lambda sigma: H_const
-    energy_fn  = lambda sigma: float(sigma @ (J @ sigma)) / (2.0 * N * math.sqrt(N))
-    edge_fn = lambda q: -2.0 * math.sqrt(2.0)
+    hessian_fn   = lambda sigma: H_const
+    energy_fn    = lambda sigma: float(sigma @ (J @ sigma)) / (2.0 * N * math.sqrt(N))
+    edge_fn      = lambda q: -2.0 * math.sqrt(2.0)
 
     trajectory = spatial_hessian_descent_p2(
         step_size      = 1.0 / k,

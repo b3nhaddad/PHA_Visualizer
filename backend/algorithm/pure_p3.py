@@ -111,7 +111,7 @@ def build(model: PureSpinSpec, k: int) -> AlgorithmResult:
     #   General formula: -2·√(p(p-1)) · max(q, 1e-9)^((p-2)/2)
     hessian_fn = lambda sigma: torch.einsum("ijk,k->ij", J, sigma) / N
 
-    energy_fn = lambda sigma: torch.einsum("ijk,i,j,k->", J, sigma, sigma, sigma) / (6.0 * N * N)
+    energy_fn = lambda sigma: float(torch.einsum("ijk,i,j,k->", J, sigma, sigma, sigma)) / (6.0 * N * N)
 
     edge_fn = lambda q: -2.0 * math.sqrt(3 * 2) * max(q, 1e-9) ** 0.5
 

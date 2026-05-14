@@ -53,7 +53,7 @@ def build_snapshot(
         radius=round(math.sqrt(N * q), 6),
         sigma=[round(x, 6) for x in sigma.tolist()],
         v_chosen=[round(x, 6) for x in v_unit],
-        energy_density=round(result.energy_fn(sigma), 6),
+        energy_density=round(float(result.energy_fn(sigma)), 6),
         lambda_min_tangent=round(lam_min, 6),
         spectral_edge_target=round(edge_val, 6),
         edge_target_satisfied=lam_min <= edge_val + 0.01,

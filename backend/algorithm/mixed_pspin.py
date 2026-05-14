@@ -159,13 +159,23 @@ def build(model: MixedSpinSpec, k: int) -> AlgorithmResult:
     edge_fn = lambda q: _spectral_edge(components, q)
 
     # ── Step 9: Run the mixed descent algorithm ──────────────────────────
-    trajectory = spatial_hessian_descentp3(
-        step_size      = 1.0 / k,
-        dimensionality = N,
-        start_position = torch.zeros(N, device=_device),
-        hessian_fn     = hessian_fn,
-        n_steps        = k,
-    )
+    if 3 in disorder:
+        trajectory = spatial_hessian_descentp3(
+            step_size      = 1.0 / k,
+            dimensionality = N,
+            start_position = torch.zeros(N, device=_device),
+            hessian_fn     = hessian_fn,
+            n_steps        = k,
+            J = disorder[3],
+        )
+    else:
+        trajectory = spatial_hessian_descentp3(
+            step_size=1.0 / k,
+            dimensionality=N,
+            start_position=torch.zeros(N, device=_device),
+            hessian_fn=hessian_fn,
+            n_steps=k,
+        )
 
     # ── Step 10: Compute E_∞ and assemble the result ───────────────────
     #

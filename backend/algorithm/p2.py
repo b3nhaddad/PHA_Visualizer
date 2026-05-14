@@ -30,32 +30,27 @@ def spatial_hessian_descent_p2(step_size, dimensionality, start_position, hessia
     N = dimensionality
     trajectory = [position.clone()]
 
-    # Compute Hessian eigendecomposition ONCE (constant for p=2)
+    # Compute Hessian ONCE (constant for p=2)
     hess = hessian_fn(position)
-    eigenvalues, eigenvectors = torch.linalg.eigh(hess)
 
     for i in range(n_steps):
 
         norm_sq = torch.dot(position, position)
 
-        # Find most negative eigenvector orthogonal to position
-        for j in range(len(eigenvalues)):
-            v = eigenvectors[:, j].clone()
+        # Project Hessian to tangent space at current position
+        if norm_sq > 1e-12:
+            M = torch.eye(N, device=device) - torch.outer(position, position) / norm_sq
+            hess_proj = M @ hess @ M
+        else:
+            hess_proj = hess
 
-            # Skip if v is parallel to position
-            if norm_sq > 1e-10 and abs(torch.dot(v, position)) / torch.sqrt(norm_sq) > 0.99:
-                continue
+        # Most negative eigenvector of projected Hessian is already tangent
+        _, eigenvectors = torch.linalg.eigh(hess_proj)
+        v = eigenvectors[:, 0].clone()
 
-            # Orthogonalize v to position
-            if norm_sq > 1e-10:
-                v = v - torch.dot(v, position) * position / norm_sq
-                v = v / torch.linalg.norm(v)
-
-            # Flip sign if gradient points same direction as v
-            if gradient_fn is not None and torch.dot(v, gradient_fn(position)) > 0:
-                v = -v
-
-            break
+        # Flip sign if gradient points same direction as v
+        if gradient_fn is not None and torch.dot(v, gradient_fn(position)) > 0:
+            v = -v
 
         position = (position + sqrt(N) * step_size * v).flatten()
 

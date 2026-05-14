@@ -14,3 +14,5 @@ def hessian_fn(sigma,H):
     return torch.autograd.functional.hessian(H, sigma)
 
 def H_p3(s,J):
+    return -torch.einsum('ijk,i,j,k', J, s, s, s)
+

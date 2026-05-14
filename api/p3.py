@@ -75,3 +75,13 @@ def spatial_hessian_descentp3(step_size, dimensionality, start_position, hessian
         #has to return current position
 
     return trajectory
+
+J = torch.randn(N, N, N)
+
+# symmetrize
+J = (J + J.permute(0,2,1) + J.permute(1,0,2) +
+         J.permute(1,2,0) + J.permute(2,0,1) +
+         J.permute(2,1,0)) / 6
+
+# normalize separately
+J = J / (N ** (2/3))  # standard normalization for p=3
